@@ -6,3 +6,5 @@ rel/emqtt
 *.erl~
 *.hrl~
 *.beam
+\#*\#
+.#*
