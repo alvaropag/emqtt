@@ -3,4 +3,6 @@ ebin
 var
 *.log
 rel/emqtt
-
+*.erl~
+*.hrl~
+*.beam
