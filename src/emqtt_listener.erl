@@ -20,9 +20,18 @@
 
 -export([spec/2, listener_started/3, listener_stopped/3]).
 
-spec({Listener, SockOpts}, Callback) ->
-    [tcp_listener_spec(emqtt_tcp_listener_sup, Address, SockOpts,
-		 mqtt, "TCP Listener", Callback) || Address <- tcp_listener_addresses(Listener)].
+%% Callback is emqtt_client_sup:start_child
+spec({Listener, tcp, SockOpts}, Callback) ->
+    [tcp_listener_spec(emqtt_tcp_listener_sup, Address, SockOpts,  mqtt, 
+		       "TCP Listener", Callback) || Address <- tcp_listener_addresses(Listener)];
+
+spec({Listener, ssh, SockOpts}, Callback) ->
+    [ssh_listener_spec(emqtt_ssh_listener_sup, Address, SockOpts, mqtt,
+		       "SSH Listener", Callback) || Address <- tcp_listener_addresses(Listener)].
+
+%% FIXME
+ssh_listener_spec(NamePrefix, {IPAddress, Port, Family}, SocketOpts, Protocol, Label, OnConnect) ->
+    ok.
 
 tcp_listener_spec(NamePrefix, {IPAddress, Port, Family}, SocketOpts,
                   Protocol, Label, OnConnect) ->

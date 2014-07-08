@@ -1,20 +1,21 @@
--module(emqtt_ssh_socket_channel).
+-module(emqtt_ssh_socket_subsystem).
 
 -behaviour(ssh_daemon_channel).
 
 -export([subsystem_spec/1]).
 -export([init/1, handle_ssh_msg/2, handle_msg/2, terminate/2, handle_data/3]).
 
+-include("emqtt_net.hrl").
 
--record(state, {cm,         %%Connection _ConnectionManager
-		channel_id} %%Channel ID
+-record(state, {cm,         %% Connection _ConnectionManager
+		channel_id, %% Channel ID
+		buffer}     %% Buffer for the received data... 
        ).
+
 
 %%The subsystem spec is a name for your subsystem, it MUST have a '@' signal in the name
 subsystem_spec(Options) ->
-    {"ssh_socket@zotonic", {?MODULE, Options}}.
-    
-    
+    {?SSH_SOCKET_SUBSYSTEM, {?MODULE, Options}}.
 init(Options) ->
   State = #state{},
   {ok, State}.
@@ -58,12 +59,15 @@ handle_msg({ssh_channel_up, ChannelId, ConnectionManager}, State) ->
     {ok, #state{channel_id = ChannelId,
 		     cm = ConnectionManager}}.    
 		     
-handle_data(Type, Data, #state{cm=CM, channel_id=ChId} = State) ->
-    %FIXME: handle the data, buffer it...
-    State.
+handle_data(Type, Data, #state{cm=CM, channel_id=ChId, buffer=Buffer} = State) ->
+    State#state{buffer = <<Buffer/binary, Data/binary>>}.
 
 terminate(Reason, State) ->
     error_logger:info_msg("terminate, Reason=~p, State=~p~n", [Reason, State]),
     ok. 
 
-  
+recv(State) ->  
+    Data = State#state.buffer,
+    #state{cm = State#state.cm, channel_id = State#state.channel_id, buffer = <<>>}.
+
+

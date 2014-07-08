@@ -20,11 +20,11 @@
 -export([start_link/0, go/2, info/1]).
 
 -export([init/1,
-		handle_call/3,
-		handle_cast/2,
-		handle_info/2,
+	handle_call/3,
+	handle_cast/2,
+	handle_info/2,
         code_change/3,
-		terminate/2]).
+	terminate/2]).
 
 -include("emqtt.hrl").
 
@@ -37,19 +37,19 @@
 -define(CLIENT_ID_MAXLEN, 23).
 
 -record(state, {socket,
-				conn_name,
-				await_recv,
-				connection_state,
-				conserve,
-				parse_state,
+		conn_name,
+		await_recv,
+		connection_state,
+		conserve,
+		parse_state,
                 message_id,
                 client_id,
                 clean_sess,
                 will_msg,
-				keep_alive, 
-				awaiting_ack,
+		keep_alive, 
+		awaiting_ack,
                 subtopics,
-				awaiting_rel}).
+		awaiting_rel}).
 
 
 -define(FRAME_TYPE(Frame, Type),

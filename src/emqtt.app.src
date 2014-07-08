@@ -22,7 +22,7 @@
 	emqtt_sup,
 	emqtt_socket,
 	emqtt_ssh_socket,
-	emqtt_ssh_socket_channel,
+	emqtt_ssh_socket_subsystem,
 	file_handle_cache,
 	gen_server2,
 	priority_queue,
