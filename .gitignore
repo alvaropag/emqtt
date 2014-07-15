@@ -8,3 +8,7 @@ rel/emqtt
 *.beam
 \#*\#
 .#*
+.rebar/
+erl_crash.dump
+log/
+rel/files/app.config.old

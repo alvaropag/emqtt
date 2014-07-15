@@ -58,7 +58,8 @@ init([Listeners]) ->
 		?CHILD(emqtt_router, worker),
 		?CHILD(emqtt_registry, worker),
 		?CHILD(emqtt_client_monitor, worker),
-		?CHILD(emqtt_client_sup, supervisor)
+		?CHILD(emqtt_client_sup, supervisor),
+		?CHILD(emqtt_socket_sup, supervisor)
 		| listener_children(Listeners) ]}
 	}.
 

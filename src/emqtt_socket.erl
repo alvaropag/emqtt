@@ -19,11 +19,12 @@
 
 %% removed from the export 
 %% -export([send/2, close/1, recv/2, recv/3, controlling_process/2]).
+-export([send/2, close/1, controlling_process/2]).
 
 -include("emqtt_net.hrl").
 
 
-%% -record(state, {}).
+-record(state, {cb_module, emqtt_socket}).
 
 %%%===================================================================
 %%% API
@@ -54,8 +55,8 @@ start_link() ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([]) ->
-    {ok, #emqtt_socket{}}.
+init([CBModule, Socket]) ->
+    {ok, #state{cb_module = CBModule, emqtt_socket = Socket}}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -137,18 +138,18 @@ send(#emqtt_socket{type=tcp, connection = Conn} = Socket, Packet) ->
 send(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Packet) ->
     emqtt_ssh_socket:send(Conn, Channel, Packet).
 
-recv(#emqtt_socket{type=tcp, connection = Conn} = Socket, Length) -> 
-    recv(Socket, Length, 0);
+%recv(#emqtt_socket{type=tcp, connection = Conn} = Socket, Length) -> 
+%    recv(Socket, Length, 0);
 
-recv(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Length) ->
-    recv(Socket, Length, 0).
+%recv(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Length) ->
+%    recv(Socket, Length, 0).
  
-recv(#emqtt_socket{type=tcp, connection = Conn} = Socket, Length, Timeout) -> 
-    gen_tcp:recv(Conn, Length, Timeout);
+%recv(#emqtt_socket{type=tcp, connection = Conn} = Socket, Length, Timeout) -> 
+%    gen_tcp:recv(Conn, Length, Timeout);
 
-recv(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Length, Timeout) ->
+%recv(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Length, Timeout) ->
     %will call the receive from the emqtt_ssh_socket
-    emqtt_ssh_socket:recv(Conn, Channel, Length, Timeout).
+%    emqtt_ssh_socket:recv(Conn, Channel, Length, Timeout).
 
 close(#emqtt_socket{type=tcp, connection = Conn} = Socket) ->
     gen_tcp:close(Conn);
@@ -164,9 +165,9 @@ controlling_process(#emqtt_socket{type=tcp, connection = Conn} = Socket, Pid) ->
 controlling_process(#emqtt_socket{type=ssh} = Socket, Pid) ->
     ok.
 
-setopts(#emqtt_socket{type = tcp, connection = Conn} = Socket, Options) ->
-    inet:setopts(Conn, Options);
+%setopts(#emqtt_socket{type = tcp, connection = Conn} = Socket, Options) ->
+%    inet:setopts(Conn, Options);
 
-setopts(#emqtt_socket{type = ssh} = Socket, Options) -> 
-    ok. 
+%setopts(#emqtt_socket{type = ssh} = Socket, Options) -> 
+%    ok. 
 

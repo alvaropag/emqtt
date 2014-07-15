@@ -32,15 +32,14 @@
 
 -include("emqtt_internal.hrl").
 
+-include("emqtt_net.hrl").
+
 -include_lib("elog/include/elog.hrl").
 
 -define(CLIENT_ID_MAXLEN, 23).
 
--record(state, {socket,
+-record(state, {emqtt_socket = undefined,
 		conn_name,
-		await_recv,
-		connection_state,
-		conserve,
 		parse_state,
                 message_id,
                 client_id,
@@ -65,7 +64,8 @@ info(Pid) ->
 	gen_server2:call(Pid, info).
 
 init([]) ->
-    {ok, undefined, hibernate, {backoff, 1000, 1000, 10000}}.
+    process_flag(trap_exit, true),
+    {ok, #state{}, hibernate, {backoff, 1000, 1000, 10000}}.
 
 handle_call(info, _From, #state{conn_name=ConnName, 
 	message_id=MsgId, client_id=ClientId} = State) ->
@@ -74,6 +74,7 @@ handle_call(info, _From, #state{conn_name=ConnName,
 			{client_id, ClientId}],
 	{reply, Info, State};
 
+%% Shouldn't be called anymore...
 handle_call({go, Sock}, _From, _State) ->
     process_flag(trap_exit, true),
     ok = throw_on_error(
@@ -83,22 +84,39 @@ handle_call({go, Sock}, _From, _State) ->
 	emqtt_client_monitor:mon(self()),
     ?INFO("accepting connection (~s)", [ConnStr]),
     {reply, ok, 
-	  control_throttle(
-       #state{ socket           = Sock,
+%	  control_throttle(
+       #state{ emqtt_socket           = Sock,
                conn_name        = ConnStr,
-               await_recv       = false,
-               connection_state = running,
-               conserve         = false,
+               %await_recv       = false,
+               %connection_state = running,
+               %conserve         = false,
                parse_state      = emqtt_frame:initial_state(),
 			   message_id		= 1,
                subtopics		= [],
 			   awaiting_ack		= gb_trees:empty(),
-			   awaiting_rel		= gb_trees:empty()})}.
+			   awaiting_rel		= gb_trees:empty()}
+%    )
+}.
+
+
+handle_cast({emqtt_socket, Socket}, State)->
+    %%TODO: call the emqtt_net:connection_string for each kind of socket
+    {noreply, #state{emqtt_socket = Socket}};
+
+
+handle_cast({data, Data, Socket}, State) ->
+    process_received_bytes(Data, State);
+
+handle_cast({error, Reason, Socket}, State) ->
+    network_error(Reason, State);
+
+handle_cast({closed, Socket}, State) ->
+    {stop, closed, State};
 
 handle_cast(Msg, State) ->
-	{stop, {badmsg, Msg}, State}.
+    {stop, {badmsg, Msg}, State}.
 
-handle_info({route, Msg}, #state{socket = Sock, message_id=MsgId} = State) ->
+handle_info({route, Msg}, #state{emqtt_socket = Sock, message_id=MsgId} = State) ->
 
 	#mqtt_msg{retain     = Retain,
 			  qos        = Qos,
@@ -134,19 +152,19 @@ handle_info({route, Msg}, #state{socket = Sock, message_id=MsgId} = State) ->
 		{noreply, next_msg_id(State)}
 	end;
 
-handle_info({inet_reply, _Ref, ok}, State) ->
-    {noreply, State, hibernate};
+%handle_info({inet_reply, _Ref, ok}, State) ->
+%    {noreply, State, hibernate};
 
-handle_info({inet_async, Sock, _Ref, {ok, Data}}, #state{ socket = Sock}=State) ->
-    process_received_bytes(
-      Data, control_throttle(State #state{ await_recv = false }));
+%handle_info({inet_async, Sock, _Ref, {ok, Data}}, #state{ socket = Sock}=State) ->
+%    process_received_bytes(
+%      Data, control_throttle(State #state{ await_recv = false }));
 
-handle_info({inet_async, _Sock, _Ref, {error, Reason}}, State) ->
-    network_error(Reason, State);
+%handle_info({inet_async, _Sock, _Ref, {error, Reason}}, State) ->
+%    network_error(Reason, State);
 
-handle_info({inet_reply, _Sock, {error, Reason}}, State) ->
-	?ERROR("sock error: ~p~n", [Reason]), 
-	{noreply, State};
+%handle_info({inet_reply, _Sock, {error, Reason}}, State) ->
+%	?ERROR("sock error: ~p~n", [Reason]), 
+%	{noreply, State};
 
 handle_info(keep_alive_timeout, #state{keep_alive=KeepAlive}=State) ->
 	case emqtt_keep_alive:state(KeepAlive) of
@@ -176,11 +194,11 @@ throw_on_error(E, Thunk) ->
 	Res             -> Res
     end.
 
-async_recv(Sock, Length, infinity) when is_port(Sock) ->
-    prim_inet:async_recv(Sock, Length, -1);
+%async_recv(Sock, Length, infinity) when is_port(Sock) ->
+%    prim_inet:async_recv(Sock, Length, -1);
 
-async_recv(Sock, Length, Timeout) when is_port(Sock) ->
-    prim_inet:async_recv(Sock, Length, Timeout).
+%async_recv(Sock, Length, Timeout) when is_port(Sock) ->
+%    prim_inet:async_recv(Sock, Length, Timeout).
 
 %-------------------------------------------------------
 % receive and parse tcp data
@@ -195,7 +213,7 @@ process_received_bytes(Bytes,
     case emqtt_frame:parse(Bytes, ParseState) of
 	{more, ParseState1} ->
 		{noreply,
-		 control_throttle( State #state{ parse_state = ParseState1 }),
+		 State#state{ parse_state = ParseState1},
 		 hibernate};
 	{ok, Frame, Rest} ->
 		case process_frame(Frame, State) of
@@ -233,8 +251,8 @@ process_request(?CONNECT,
                                           password   = Password,
                                           proto_ver  = ProtoVersion,
                                           clean_sess = CleanSess,
-										  keep_alive = AlivePeriod,
-                                          client_id  = ClientId } = Var}, #state{socket = Sock} = State) ->
+					  keep_alive = AlivePeriod,
+                                          client_id  = ClientId } = Var}, #state{emqtt_socket = Sock} = State) ->
     {ReturnCode, State1} =
         case {ProtoVersion =:= ?MQTT_PROTO_MAJOR,
               valid_client_id(ClientId)} of
@@ -262,8 +280,7 @@ process_request(?CONNECT,
                                          return_code = ReturnCode }}),
     {ok, State1};
 
-process_request(?PUBLISH, Frame=#mqtt_frame{
-									fixed = #mqtt_frame_fixed{qos = ?QOS_0}}, State) ->
+process_request(?PUBLISH, Frame=#mqtt_frame{fixed = #mqtt_frame_fixed{qos = ?QOS_0}}, State) ->
 	emqtt_router:publish(make_msg(Frame)),
 	{ok, State};
 
@@ -271,7 +288,7 @@ process_request(?PUBLISH,
                 Frame=#mqtt_frame{
                   fixed = #mqtt_frame_fixed{qos    = ?QOS_1},
                   variable = #mqtt_frame_publish{message_id = MsgId}}, 
-				State=#state{socket=Sock}) ->
+				State=#state{emqtt_socket=Sock}) ->
 	emqtt_router:publish(make_msg(Frame)),
 	send_frame(Sock, #mqtt_frame{fixed = #mqtt_frame_fixed{ type = ?PUBACK },
 							  variable = #mqtt_frame_publish{ message_id = MsgId}}),
@@ -281,7 +298,7 @@ process_request(?PUBLISH,
                 Frame=#mqtt_frame{
                   fixed = #mqtt_frame_fixed{qos    = ?QOS_2},
                   variable = #mqtt_frame_publish{message_id = MsgId}}, 
-				State=#state{socket=Sock}) ->
+				State=#state{emqtt_socket=Sock}) ->
 	emqtt_router:publish(make_msg(Frame)),
 	put({msg, MsgId}, pubrec),
 	send_frame(Sock, #mqtt_frame{fixed = #mqtt_frame_fixed{type = ?PUBREC},
@@ -295,7 +312,7 @@ process_request(?PUBACK, #mqtt_frame{}, State) ->
 
 process_request(?PUBREC, #mqtt_frame{
 	variable = #mqtt_frame_publish{message_id = MsgId}}, 
-	State=#state{socket=Sock}) ->
+	State=#state{emqtt_socket=Sock}) ->
 	%TODO: fixme later
 	send_frame(Sock,
 	  #mqtt_frame{fixed    = #mqtt_frame_fixed{ type = ?PUBREL},
@@ -305,7 +322,7 @@ process_request(?PUBREC, #mqtt_frame{
 process_request(?PUBREL,
                 #mqtt_frame{
                   variable = #mqtt_frame_publish{message_id = MsgId}},
-				  State=#state{socket=Sock}) ->
+				  State=#state{emqtt_socket=Sock}) ->
 	erase({msg, MsgId}),
 	send_frame(Sock,
 	  #mqtt_frame{fixed    = #mqtt_frame_fixed{ type = ?PUBCOMP},
@@ -322,7 +339,7 @@ process_request(?SUBSCRIBE,
                   variable = #mqtt_frame_subscribe{message_id  = MessageId,
                                                    topic_table = Topics},
                   payload = undefined},
-                #state{socket=Sock} = State) ->
+                #state{emqtt_socket=Sock} = State) ->
 
 	[emqtt_router:subscribe({Name, Qos}, self()) || 
 			#mqtt_topic{name=Name, qos=Qos} <- Topics],
@@ -340,7 +357,7 @@ process_request(?UNSUBSCRIBE,
                 #mqtt_frame{
                   variable = #mqtt_frame_subscribe{message_id  = MessageId,
                                                    topic_table = Topics },
-                  payload = undefined}, #state{socket = Sock, client_id = ClientId} = State) ->
+                  payload = undefined}, #state{emqtt_socket = Sock, client_id = ClientId} = State) ->
 
 	
 	[emqtt_router:unsubscribe(Name, self()) || #mqtt_topic{name=Name} <- Topics], 
@@ -350,7 +367,7 @@ process_request(?UNSUBSCRIBE,
 
     {ok, State};
 
-process_request(?PINGREQ, #mqtt_frame{}, #state{socket=Sock, keep_alive=KeepAlive}=State) ->
+process_request(?PINGREQ, #mqtt_frame{}, #state{emqtt_socket=Sock, keep_alive=KeepAlive}=State) ->
 	%Keep alive timer
 	KeepAlive1 = emqtt_keep_alive:reset(KeepAlive),
     send_frame(Sock, #mqtt_frame{fixed = #mqtt_frame_fixed{ type = ?PINGRESP }}),
@@ -389,7 +406,8 @@ send_will_msg(#state{will_msg = WillMsg }) ->
 	emqtt_router:publish(WillMsg).
 
 send_frame(Sock, Frame) ->
-    erlang:port_command(Sock, emqtt_frame:serialise(Frame)).
+    emqtt_socket:send(Sock, emqtt_frame:serialise(Frame)).
+    %erlang:port_command(Sock, emqtt_frame:serialise(Frame)).
 
 %%----------------------------------------------------------------------------
 network_error(Reason,
@@ -399,25 +417,24 @@ network_error(Reason,
     % todo: flush channel after publish
     stop({shutdown, conn_closed}, State).
 
-run_socket(State = #state{ connection_state = blocked }) ->
-    State;
-run_socket(State = #state{ await_recv = true }) ->
-    State;
-run_socket(State = #state{ socket = Sock }) ->
-    async_recv(Sock, 0, infinity),
-    State#state{ await_recv = true }.
+%run_socket(State = #state{ connection_state = blocked }) ->
+%    State;
+%run_socket(State = #state{ await_recv = true }) ->
+%    State;
+%run_socket(State = #state{ socket = Sock }) ->
+%    async_recv(Sock, 0, infinity),
+%    State#state{ await_recv = true }.
 
-control_throttle(State = #state{ connection_state = Flow,
-                                 conserve         = Conserve }) ->
-    case {Flow, Conserve} of
-        {running,   true} -> State #state{ connection_state = blocked };
-        {blocked,  false} -> run_socket(State #state{
-                                                connection_state = running });
-        {_,            _} -> run_socket(State)
-    end.
+%control_throttle(State = #state{ connection_state = Flow,
+%                                 conserve         = Conserve }) ->
+%    case {Flow, Conserve} of
+%        {running,   true} -> State #state{ connection_state = blocked };
+%        {blocked,  false} -> run_socket(State #state{
+%                                                connection_state = running });
+%        {_,            _} -> run_socket(State)
+%    end.
 
 stop(Reason, State ) ->
-
     {stop, Reason, State}.
 
 valid_client_id(ClientId) ->

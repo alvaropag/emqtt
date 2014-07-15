@@ -15,7 +15,7 @@
 
 -module(emqtt_client_sup).
 
--export([start_link/0, start_client/1]).
+-export([start_link/0, start_client/1, start_client/0]).
 
 -behaviour(supervisor2).
 
@@ -39,3 +39,6 @@ start_client(Sock) ->
 
 	Client.
 
+start_client() ->
+    {ok, Client} = supervisor:start_child(?MODULE, []),
+    Client.
