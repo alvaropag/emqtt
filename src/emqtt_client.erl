@@ -385,7 +385,7 @@ process_request(?PINGREQ, #mqtt_frame{}, #state{emqtt_socket=Sock, keep_alive=Ke
 
 process_request(?DISCONNECT, #mqtt_frame{}, State=#state{emqtt_socket = EmqttSocket, client_id=ClientId}) ->
 	?INFO("~s disconnected", [ClientId]),
-    emqtt_socket:close(EmqttSocket),
+    %emqtt_socket:close(EmqttSocket),
     {stop, State}.
 
 next_msg_id(State = #state{ message_id = 16#ffff }) ->
