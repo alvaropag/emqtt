@@ -22,16 +22,18 @@
 
 %% Callback is emqtt_client_sup:start_child
 spec({Listener, tcp, SockOpts}, Callback) ->
-    [tcp_listener_spec(emqtt_tcp_listener_sup, Address, SockOpts,  mqtt, 
+    [tcp_listener_spec(tcp_listener_sup, Address, SockOpts,  mqtt, 
 		       "TCP Listener", Callback) || Address <- tcp_listener_addresses(Listener)];
 
 spec({Listener, ssh, SockOpts}, Callback) ->
-    [ssh_listener_spec(emqtt_ssh_listener_sup, Address, SockOpts, mqtt,
-		       "SSH Listener", Callback) || Address <- tcp_listener_addresses(Listener)].
+    [ssh_listener_spec(ssh_listener_sup, Address, SockOpts, mqtt,
+		       "SSH Listener") || Address <- tcp_listener_addresses(Listener)].
 
-%% FIXME
-ssh_listener_spec(NamePrefix, {IPAddress, Port, Family}, SocketOpts, Protocol, Label, OnConnect) ->
-    ok.
+ssh_listener_spec(NamePrefix, {IPAddress, Port, Family}, SocketOpts, Protocol, Label) ->
+    io:fwrite("IPAddress = ~p, Port = ~p, Family = ~p~n", [IPAddress, Port, Family]),
+    {emqtt_net:ssh_name(NamePrefix, IPAddress, Port), 
+       {emqtt_ssh_daemon_sup, start_link, [IPAddress, Port, SocketOpts]}, 
+        transient, infinity, supervisor, [emqtt_ssh_daemon_sup]}.
 
 tcp_listener_spec(NamePrefix, {IPAddress, Port, Family}, SocketOpts,
                   Protocol, Label, OnConnect) ->

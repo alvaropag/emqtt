@@ -15,7 +15,7 @@
 
 -module(emqtt_net).
 
--export([tcp_name/3, tcp_host/1, getaddr/2, port_to_listeners/1]).
+-export([tcp_name/3, ssh_name/3, tcp_host/1, getaddr/2, port_to_listeners/1]).
 
 -export([tune_buffer_size/1, connection_string/2]).
 
@@ -146,6 +146,12 @@ tcp_name(Prefix, IPAddress, Port)
       lists:flatten(
 		io_lib:format(
 			"~w_~s:~w", [Prefix, inet_parse:ntoa(IPAddress), Port]))).
+
+%% For now use the same as tcp_name
+ssh_name(Prefix, IPAddress, Port) ->
+    Result = tcp_name(Prefix, IPAddress, Port),
+    io:fwrite("ssh_name = ~p~n", [Result]),
+    Result.
 
 tune_buffer_size(Sock) ->
     case getopts(Sock, [sndbuf, recbuf, buffer]) of

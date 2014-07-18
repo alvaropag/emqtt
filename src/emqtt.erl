@@ -26,6 +26,7 @@ start() ->
 	mnesia:create_schema([node()]),	
 	mnesia:start(),
 	lager:start(),
+	ssh:start(),
 	application:start(emqtt).
 
 
