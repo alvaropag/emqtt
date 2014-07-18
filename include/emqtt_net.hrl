@@ -4,6 +4,7 @@
 
 -record(emqtt_socket, {type, 
 		       connection, 
-		       channel=undefined}).
+		       channel=undefined, 
+		       proc_socket_pid = undefined}).
 
 -define(SSH_SOCKET_SUBSYSTEM, "z_ssh_subsystem@zotonic.com").

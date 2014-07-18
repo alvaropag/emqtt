@@ -17,9 +17,13 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3]).
 
-%% removed from the export 
-%% -export([send/2, close/1, recv/2, recv/3, controlling_process/2]).
--export([send/2, close/1, controlling_process/2]).
+
+-export([send/2, close/1]).
+
+-export([forward_data_to_client/3, forward_error_to_client/3, forward_closed_to_client/2, forward_socket_to_client/2]).
+
+-export([create_ssh_socket/2, create_tcp_socket/1]).
+
 
 -include("emqtt_net.hrl").
 
@@ -152,18 +156,12 @@ send(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Pac
 %    emqtt_ssh_socket:recv(Conn, Channel, Length, Timeout).
 
 close(#emqtt_socket{type=tcp, connection = Conn} = Socket) ->
+    io:fwrite("emqtt_socket:close(tcp, ~p) closed", [Conn]),
     gen_tcp:close(Conn);
 
 close(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket) ->
     emqtt_ssh_socket:close(Conn, Channel).
     %ssh_connection:close(Conn, Channel).
-
-controlling_process(#emqtt_socket{type=tcp, connection = Conn} = Socket, Pid) ->
-    gen_tcp:controlling_process(Conn, Pid);
-
-% There is no reason to do this for the SSH... we never use the socket, always the channel
-controlling_process(#emqtt_socket{type=ssh} = Socket, Pid) ->
-    ok.
 
 %setopts(#emqtt_socket{type = tcp, connection = Conn} = Socket, Options) ->
 %    inet:setopts(Conn, Options);
@@ -171,3 +169,20 @@ controlling_process(#emqtt_socket{type=ssh} = Socket, Pid) ->
 %setopts(#emqtt_socket{type = ssh} = Socket, Options) -> 
 %    ok. 
 
+forward_data_to_client(ClientPid, Data,  EmqttSocket) ->
+    gen_server:cast(ClientPid, {data, Data, EmqttSocket}).
+
+forward_error_to_client(ClientPid, Reason, EmqttSocket) ->
+    gen_server:cast(ClientPid, {error, Reason, EmqttSocket}).
+
+forward_closed_to_client(ClientPid, EmqttSocket) ->
+    gen_server:cast(ClientPid, {closed, EmqttSocket}).
+
+forward_socket_to_client(ClientPid, EmqttSocket) ->
+    gen_server:cast(ClientPid, {emqtt_socket, EmqttSocket}).
+
+create_ssh_socket(ConnectionManager, ChannelId) ->
+    #emqtt_socket{type = shh, connection = ConnectionManager, channel = ChannelId}.
+
+create_tcp_socket(Socket) ->
+    #emqtt_socket{type = tcp, connection = Socket}.

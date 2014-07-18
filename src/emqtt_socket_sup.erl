@@ -6,6 +6,8 @@
 
 -export([start_link/0]).%, start_child/3, start_child/4]).
 
+-export([child_spec/4]).
+
 -include("emqtt_net.hrl").
 
 
@@ -26,3 +28,10 @@ init([]) ->
 
     
 
+child_spec(tcp, ConnName, EmqttClientPid, EmqttSocketRecord) ->
+    {ConnName, 
+	{emqtt_tcp_socket, start_link, [EmqttClientPid, EmqttSocketRecord]},
+	temporary,  %%this means I don't need to use the supervisor:delete_child
+	5000,
+	worker,
+	[emqtt_tcp_socket]}.

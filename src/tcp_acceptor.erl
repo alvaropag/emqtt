@@ -43,27 +43,26 @@ handle_call(_Request, _From, State) ->
 
 handle_cast(accept, State) ->
     %ok = file_handle_cache:obtain(),
-    accept(State),
-    gen_server:cast(self(), accept);
+    accept(State);
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({inet_async, LSock, Ref, {ok, Sock}},
-            State = #state{callback={M,F,A}, sock=LSock}) ->
+%handle_info({inet_async, LSock, Ref, {ok, Sock}},
+%            State = #state{callback={M,F,A}, sock=LSock}) ->
 
     %% patch up the socket so it looks like one we got from
     %% gen_tcp:accept/1
-    {ok, Mod} = inet_db:lookup_socket(LSock),
-    inet_db:register_socket(Sock, Mod),
+%    {ok, Mod} = inet_db:lookup_socket(LSock),
+%    inet_db:register_socket(Sock, Mod),
 
    
     %% handle
-    file_handle_cache:transfer(apply(M, F, A ++ [Sock])),
-    ok = file_handle_cache:obtain(),
+%    file_handle_cache:transfer(apply(M, F, A ++ [Sock])),
+%    ok = file_handle_cache:obtain(),
 
     %% accept more
-    accept(State);
+%    accept(State);
 
 %handle_info({inet_async, LSock, Ref, {error, closed}},
 %            State=#state{sock=LSock, ref=Ref}) ->
@@ -91,32 +90,31 @@ accept(State = #state{callback={M,F,A}, sock=LSock}) ->
         {ok, Socket} -> 
 	   %%Start the emqtt_tcp_socket, this has to be put in another function....
 	   io:fwrite("Creating a new socket on tcp_acceptor:accept/1~n"),
+
 	   %%Start the emqtt_client
-	   EmqttClientPid = apply(emqtt_client_sup, start_client, []),
+           io:fwrite("tcp_acceptor:callback={~p, ~p, ~p)~n", [M, F, A]),
+	   EmqttClientPid = apply(M, F, A), %emqtt_client_sup, start_client, []),
 	   io:fwrite("Creating emqtt_client with pid = ~p~n", [EmqttClientPid]),
-	   EmqttSocketRecord = #emqtt_socket{type = tcp, connection = Socket},
-	    io:fwrite("Definig record emqtt_socket~n"),
-	    {ok, {Address, Port}} = inet:peername(Socket),
-	   %ChildSpec = {emqtt_net:tcp_name(tcp, Address, Port), 
-	    ChildSpec = {tcp,
-			{emqtt_tcp_socket, start_link, [EmqttClientPid, EmqttSocketRecord]},
-			temporary,
-			infinity,
-			worker,
-			[emqtt_tcp_socket]},
+
+	   EmqttSocketRecord = emqtt_socket:create_tcp_socket(Socket),
+	   io:fwrite("Definig record emqtt_socket~n"),
+
+	   {ok, {Address, Port}} = inet:peername(Socket),
+
+	   ChildSpec = emqtt_socket_sup:child_spec(tcp, emqtt_net:tcp_name(tcp, Address, Port), EmqttClientPid, EmqttSocketRecord),
 
             {ok, SocketPid} = supervisor:start_child(emqtt_socket_sup, ChildSpec),
 	    io:fwrite("Creating emqtt_tcp_socket with Pid = ~p ~n", [SocketPid]),
-	    %emqtt_socket:controlling_process(SocketPid, EmqttSocketRecord),
-	    %{ok, Mod} = inet_db:lookup_socket(LSock),
-	    %inet_db:register_socket(Socket, inet_tcp),
-	    %gen_tcp:controlling_process(SocketPid, Socket),
-	    %io:fwrite("Passing socket controller to SocketPid = ~p~n", [SocketPid]),
+
+	    ok = gen_tcp:controlling_process(Socket, SocketPid),
+	    io:fwrite("Passing socket controller to SocketPid = ~p~n", [SocketPid]),
+
 	    emqtt_tcp_socket:go(SocketPid),
-	    io:fwrite("Starting emqtt_tcp_socket"),
-	    gen_server:cast(EmqttClientPid, {socket_pid, SocketPid}),
-	    io:fwrite("Starting emqtt_client with socket_pid = ~p~n", [SocketPid]),
-	    
-	    {noreply, State};
+	    io:fwrite("Starting emqtt_tcp_socket~n"),
+
+            %loop to this function
+	    gen_server:cast(self(), accept),
+
+	    {noreply, State};  %%Return for the cast function
         Error     -> {stop, {cannot_accept, Error}, State}
     end.

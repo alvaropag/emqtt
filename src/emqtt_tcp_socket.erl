@@ -55,8 +55,6 @@ start_link(EmqttClientPid, Socket) ->
 %% @end
 %%--------------------------------------------------------------------
 init([EmqttClientPid, Socket]) ->
-    %inet:setopts(Socket, {active, once}),
-    %gen_server:cast(self(), loop),
     gen_server:cast(EmqttClientPid, {emqtt_socket, Socket}),
     {ok, #state{emqtt_client_pid = EmqttClientPid, emqtt_socket = Socket}}.
 
@@ -94,9 +92,6 @@ handle_call(_Request, _From, State) ->
 handle_cast(loop, State) ->
     loop_receive(State);
 
-%handle_cast({emqtt_client_pid, Pid}, State) ->
-%    {noreply, State#state{emqtt_client_pid = Pid});
-
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -111,6 +106,7 @@ handle_cast(_Msg, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_info(_Info, State) ->
+    io:fwrite("emqtt_tcp_socket:handle_info(_Info, State) = (~p, ~p)~n", [_Info, State]),
     {noreply, State}.
 
 %%--------------------------------------------------------------------
@@ -142,23 +138,26 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-loop_receive(#state{emqtt_client_pid = EQPid, emqtt_socket = EmqttSocket} = State) ->
+loop_receive(#state{emqtt_client_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
     %recover tcp socket from emqtt_socket record
     #emqtt_socket{type = tcp, connection = Socket} = EmqttSocket,
 
     %ask for one packet of data from the socket...
-    inet:setopts(Socket, {active, once}),
+    ok = inet:setopts(Socket, [{active, once}]),
+
+    io:fwrite("Inside loop_receive on emqtt_tcp_socket, waiting for data~n"),
 
     %forward the data/error/status to the emqtt_client process
     receive
         {tcp, S, Data} ->
-	    gen_server:cast(EQPid, {data, Data, EmqttSocket}),
-	    gen_server:cast(self(), loop);
+            emqtt_socket:forward_data_to_client(EClientPid, Data, EmqttSocket),
+	    gen_server:cast(self(), loop),
+            {noreply, State};
         {tcp_closed, S} -> 
-	    gen_server:cast(EQPid, {closed, EmqttSocket}),
-            ok;
+            emqtt_socket:forward_closed_to_client(EClientPid, EmqttSocket),
+	    io:fwrite("Connection closed on socket = ~p ~n", [S]),
+            {stop, normal, State};
 	{tcp_error, S, Reason} -> 
-	    gen_server:cast(EQPid, {error, Reason, EmqttSocket}),
-	    ok
-    end,
-    {noreply, State}.
+            emqtt_socket:forward_error_to_client(EClientPid, Reason, EmqttSocket),
+            {stop, Reason, State}
+    end.

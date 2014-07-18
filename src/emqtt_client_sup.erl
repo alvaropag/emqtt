@@ -15,7 +15,7 @@
 
 -module(emqtt_client_sup).
 
--export([start_link/0, start_client/1, start_client/0]).
+-export([start_link/0, start_client/0]).
 
 -behaviour(supervisor2).
 
@@ -29,16 +29,17 @@ init([]) ->
           [{client, {emqtt_client, start_link, []}, 
 				temporary, 5000, worker, [emqtt_client]}]}}.
 
-start_client(Sock) ->
-    {ok, Client} = supervisor:start_child(?MODULE, []),
-	ok = gen_tcp:controlling_process(Sock, Client),
-	emqtt_client:go(Client, Sock),
+%start_client(Sock) ->
+%    {ok, Client} = supervisor:start_child(?MODULE, []),
+%	ok = gen_tcp:controlling_process(Sock, Client),
+%	emqtt_client:go(Client, Sock),
 
     %% see comment in rabbit_networking:start_client/2
-    gen_event:which_handlers(error_logger),
+%    gen_event:which_handlers(error_logger),
 
-	Client.
+%	Client.
 
 start_client() ->
+    io:fwrite("emqtt_client_sup:start_client()~n"),
     {ok, Client} = supervisor:start_child(?MODULE, []),
     Client.

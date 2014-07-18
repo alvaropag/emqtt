@@ -17,7 +17,7 @@
 
 -behaviour(gen_server2).
 
--export([start_link/0, go/2, info/1]).
+-export([start_link/0, info/1]). %go/2
 
 -export([init/1,
 	handle_call/3,
@@ -64,8 +64,15 @@ info(Pid) ->
 	gen_server2:call(Pid, info).
 
 init([]) ->
+    io:fwrite("emqtt_client:init([]) function"),
     process_flag(trap_exit, true),
-    {ok, #state{}, hibernate, {backoff, 1000, 1000, 10000}}.
+    {ok, 
+     #state{parse_state = emqtt_frame:initial_state(), 
+	    message_id = 1, 
+	    subtopics = [], 
+	    awaiting_ack = gb_trees:empty(), 
+	    awaiting_rel = gb_trees:empty()}, 
+     hibernate, {backoff, 1000, 1000, 10000}}.
 
 handle_call(info, _From, #state{conn_name=ConnName, 
 	message_id=MsgId, client_id=ClientId} = State) ->
@@ -101,7 +108,10 @@ handle_call({go, Sock}, _From, _State) ->
 
 handle_cast({emqtt_socket, Socket}, State)->
     %%TODO: call the emqtt_net:connection_string for each kind of socket
-    {noreply, #state{emqtt_socket = Socket}};
+    emqtt_client_monitor:mon(self()),
+    ConnStr = "TEST",
+    ?INFO("accepting connection (~s) from emqtt_socket ~n", [ConnStr]),
+    {noreply, State#state{emqtt_socket = Socket, conn_name = ConnStr}};
 
 
 handle_cast({data, Data, Socket}, State) ->
@@ -373,8 +383,9 @@ process_request(?PINGREQ, #mqtt_frame{}, #state{emqtt_socket=Sock, keep_alive=Ke
     send_frame(Sock, #mqtt_frame{fixed = #mqtt_frame_fixed{ type = ?PINGRESP }}),
     {ok, State#state{keep_alive=KeepAlive1}};
 
-process_request(?DISCONNECT, #mqtt_frame{}, State=#state{client_id=ClientId}) ->
+process_request(?DISCONNECT, #mqtt_frame{}, State=#state{emqtt_socket = EmqttSocket, client_id=ClientId}) ->
 	?INFO("~s disconnected", [ClientId]),
+    emqtt_socket:close(EmqttSocket),
     {stop, State}.
 
 next_msg_id(State = #state{ message_id = 16#ffff }) ->
