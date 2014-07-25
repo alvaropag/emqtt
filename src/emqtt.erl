@@ -22,11 +22,12 @@
 %% @spec start() -> 'ok'
 %%
 start() ->
-	application:start(sasl),
-	mnesia:create_schema([node()]),	
-	mnesia:start(),
-	lager:start(),
-	ssh:start(),
-	application:start(emqtt).
+    application:start(sasl),
+    mnesia:create_schema([node()]),	
+    mnesia:start(),
+    lager:start(),
+    ssh:start(),
+    application:start(gproc),
+    application:start(emqtt).
 
 

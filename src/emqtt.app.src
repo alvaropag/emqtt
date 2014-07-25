@@ -47,9 +47,10 @@
 	tcp_listener_sup
   ]},
   {registered, [emqtt_auth,
-			    emqtt_router,
-				emqtt_registry,
-				emqtt_client_monitor]},
+  	        emqtt_router,
+		emqtt_registry,
+		emqtt_client_monitor]},
+
   {applications, [kernel,
                   stdlib]},
   {mod, {emqtt_app, []}},
