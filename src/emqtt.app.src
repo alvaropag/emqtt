@@ -34,6 +34,7 @@
 	emqtt_ssh_listener,
 	emqtt_tcp_acceptor,
 	emqtt_tcp_listener,
+	emqtt_protocol,
 	file_handle_cache,
 	gen_server2,
 	priority_queue,

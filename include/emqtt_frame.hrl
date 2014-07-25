@@ -49,6 +49,10 @@
 -define(CONNACK_AUTH,        5). %% not authorized
 
 
+-define(FRAME_TYPE(Frame, Type),
+        Frame = #mqtt_frame{ fixed = #mqtt_frame_fixed{ type = Type }}).
+
+
 -record(mqtt_frame, {fixed,
                      variable,
                      payload}).

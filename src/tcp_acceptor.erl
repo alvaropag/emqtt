@@ -93,7 +93,7 @@ accept(State = #state{callback={M,F,A}, sock=LSock}) ->
 
 	   %%Start the emqtt_client
            io:fwrite("tcp_acceptor:callback={~p, ~p, ~p)~n", [M, F, A]),
-	   EmqttClientPid = apply(M, F, A), %emqtt_client_sup, start_client, []),
+	   EmqttClientPid = apply(M, F, A),
 	   io:fwrite("Creating emqtt_client with pid = ~p~n", [EmqttClientPid]),
 
 	   EmqttSocketRecord = emqtt_socket:create_tcp_socket(Socket),
