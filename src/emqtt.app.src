@@ -35,6 +35,7 @@
 	emqtt_tcp_acceptor,
 	emqtt_tcp_listener,
 	emqtt_protocol,
+	emqtt_queue,
 	emqtt_queue_memory,
 	file_handle_cache,
 	gen_server2,
