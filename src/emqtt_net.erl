@@ -15,9 +15,11 @@
 
 -module(emqtt_net).
 
+-include("emqtt_net.hrl").
+
 -export([tcp_name/3, ssh_name/3, tcp_host/1, getaddr/2, port_to_listeners/1]).
 
--export([tune_buffer_size/1, connection_string/2]).
+-export([tune_buffer_size/1, conn_string/2]).
 
 -include_lib("kernel/include/inet.hrl").
 
@@ -160,12 +162,19 @@ tune_buffer_size(Sock) ->
         Err            -> Err
     end.
 
+conn_string(#emqtt_socket{type = tcp, connection = Conn}, Direction) ->
+    connection_string(Conn, Direction);
+
+conn_string(#emqtt_socket{type = ssh, connection = Conn, channel = Channel}, _) ->
+    {HostName, IP, Port} = ssh:connection_info(Conn, [peer]),
+    {ok, lists:flatten(io_lib:format("ssh_~p:~p -> ~p@~s:~p", [Conn, Channel, HostName, maybe_ntoab(IP), Port]))}.
+
 connection_string(Sock, Direction) ->
     case socket_ends(Sock, Direction) of
         {ok, {FromAddress, FromPort, ToAddress, ToPort}} ->
             {ok, lists:flatten(
 					io_lib:format(
-					   "~s:~p -> ~s:~p",
+					   "tcp_~s:~p -> ~s:~p",
 					   [maybe_ntoab(FromAddress), FromPort,
 						maybe_ntoab(ToAddress),   ToPort]))};
         Error ->

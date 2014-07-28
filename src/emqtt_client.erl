@@ -94,7 +94,7 @@ handle_call({go, Sock}, _From, _State) ->
 handle_cast({emqtt_socket, Socket}, State)->
     %%TODO: call the emqtt_net:connection_string for each kind of socket
     emqtt_client_monitor:mon(self()),
-    ConnStr = "TEST",
+    ConnStr = emqtt_net:conn_string(Socket, inbound),
     ?INFO("accepting connection (~s) from emqtt_socket ~n", [ConnStr]),
     {noreply, State#emqtt_client_state{emqtt_socket = Socket, conn_name = ConnStr}};
 

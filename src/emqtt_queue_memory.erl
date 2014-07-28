@@ -8,7 +8,8 @@
          in/2,
          out/1,
          peek/2,
-         member_of/2
+         member_of/2,
+         drop/1
          ]).
          
 
@@ -67,3 +68,6 @@ member_of(#emqtt_queue{queue_ref = QueueRef} = Queue, Item) ->
 
 member_of(_, _) ->
     {error, "Invalid queue handler"}.
+
+drop(_) ->
+    ok.

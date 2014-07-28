@@ -8,7 +8,8 @@
          in/2,
          out/1,
          peek/2,
-         member_of/2
+         member_of/2,
+         drop/1
          ]).
 
 new(Mod, QueueId) ->
@@ -29,6 +30,9 @@ peek(#emqtt_queue{queue_cb = Mod} = Queue, N) ->
 
 member_of(#emqtt_queue{queue_cb = Mod} = Queue, Item) ->
     Mod:member_of(Queue, Item).
+
+drop(#emqtt_queue{queue_cb = Mod} = Queue) ->
+    Mod:drop(Queue).
     
 
     
