@@ -64,35 +64,9 @@ handle_call(info, _From, #emqtt_client_state{conn_name=ConnName,
 	Info = [{conn_name, ConnName},
 			{message_id, MsgId},
 			{client_id, ClientId}],
-	{reply, Info, State};
-
-%% Shouldn't be called anymore...
-handle_call({go, Sock}, _From, _State) ->
-    process_flag(trap_exit, true),
-    ok = throw_on_error(
-           inet_error, fun () -> emqtt_net:tune_buffer_size(Sock) end),
-    {ok, ConnStr} = emqtt_net:connection_string(Sock, inbound),
-	%FIXME: merge to registry
-	emqtt_client_monitor:mon(self()),
-    ?INFO("accepting connection (~s)", [ConnStr]),
-    {reply, ok, 
-%	  control_throttle(
-       #emqtt_client_state{ emqtt_socket           = Sock,
-               conn_name        = ConnStr,
-               %await_recv       = false,
-               %connection_state = running,
-               %conserve         = false,
-               parse_state      = emqtt_frame:initial_state(),
-			   message_id		= 1,
-               subtopics		= [],
-			   awaiting_ack		= gb_trees:empty(),
-			   awaiting_rel		= gb_trees:empty()}
-%    )
-}.
-
+	{reply, Info, State}.
 
 handle_cast({emqtt_socket, Socket}, State)->
-    %%TODO: call the emqtt_net:connection_string for each kind of socket
     emqtt_client_monitor:mon(self()),
     ConnStr = emqtt_net:conn_string(Socket, inbound),
     ?INFO("accepting connection (~s) from emqtt_socket ~n", [ConnStr]),

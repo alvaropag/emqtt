@@ -10,6 +10,6 @@
 	  awaiting_ack,
           subtopics,
 	  awaiting_rel,
-          emqtt_queue = undefined}).
+          emqtt_session_state = undefined}).
 
 -define(CLIENT_ID_MAXLEN, 23).

@@ -89,12 +89,12 @@ process_request(?CONNECT,
         end,
     %If there is need for a queue (client is authenticated and not want a CleanSess) 
     %then create one, register in gproc and saves in the State Variable
-   Queue = verifyNeedOfQueue(ClientId, ReturnCode =:= ?CONNACK_ACCEPT, CleanSess),
+   SessionState = verifyNeedOfSession(ClientId, ReturnCode =:= ?CONNACK_ACCEPT, CleanSess),
         
     send_frame(Sock, #mqtt_frame{ fixed    = #mqtt_frame_fixed{ type = ?CONNACK},
                                   variable = #mqtt_frame_connack{
                                                 return_code = ReturnCode }}),
-    {ok, State1#emqtt_client_state{emqtt_queue = Queue}};
+    {ok, State1#emqtt_client_state{emqtt_session_state = SessionState}};
 
 process_request(?PUBLISH, Frame=#mqtt_frame{fixed = #mqtt_frame_fixed{qos = ?QOS_0}}, State) ->
 	emqtt_router:publish(make_msg(Frame)),
@@ -192,7 +192,7 @@ process_request(?PINGREQ, #mqtt_frame{}, #emqtt_client_state{emqtt_socket=Sock, 
 process_request(?DISCONNECT, #mqtt_frame{}, State=#emqtt_client_state{emqtt_socket = EmqttSocket, client_id=ClientId}) ->
     ?INFO("~s disconnected", [ClientId]),
     %release the Queue if there is one...
-    State1 = release_queue(State),
+    State1 = release_session(State),
     {stop, State1}.
 
 next_msg_id(State = #emqtt_client_state{ message_id = 16#ffff }) ->
@@ -284,19 +284,19 @@ make_will_msg(#mqtt_frame_connect{ will_retain = Retain,
               payload = Msg }.
 
                             %ClientAuthorized, CleanSess
-verifyNeedOfQueue(ClientId, true, false) ->
-    Queue = emqtt_queue:new(application:get_env(emqtt, queue_cb, emqtt_queue_memory)),
-    true = gproc:reg({n,l, ClientId}, Queue),
-    Queue;
+verifyNeedOfSession(ClientId, true, false) ->
+    Session = emqtt_session_state:new(application:get_env(emqtt, session_cb, emqtt_session_state_memory)),
+    true = gproc:reg({n,l, ClientId}, Session),
+    Session;
 
-verifyNeedOfQueue(_, _, _) ->
+verifyNeedOfSession(_, _, _) ->
     undefined.
     
-release_queue(#emqtt_client_state{client_id = ClientID, emqtt_queue = Queue} = State) ->
-    case Queue of
+release_session(#emqtt_client_state{client_id = ClientID, emqtt_session_state = Session} = State) ->
+    case Session of
         undefined -> State;
         _ -> 
-            emqtt_queue:drop(Queue),
+            emqtt_session_state:drop(Session),
             gproc:unreg(ClientID),
-            State#emqtt_client_state{emqtt_queue = undefined}
+            State#emqtt_client_state{emqtt_session_state = undefined}
     end.
