@@ -151,11 +151,10 @@ process_request(?PUBCOMP, #mqtt_frame{
 	{ok, State};
 
 process_request(?SUBSCRIBE,
-                #mqtt_frame{
-                  variable = #mqtt_frame_subscribe{message_id  = MessageId,
-                                                   topic_table = Topics},
-                  payload = undefined},
-                #emqtt_client_state{emqtt_socket=Sock} = State) ->
+    #mqtt_frame{
+       variable = #mqtt_frame_subscribe{message_id  = MessageId, topic_table = Topics},
+           payload = undefined},
+        #emqtt_client_state{emqtt_socket=Sock} = State) ->
 
 	[emqtt_router:subscribe({Name, Qos}, self()) || 
 			#mqtt_topic{name=Name, qos=Qos} <- Topics],
