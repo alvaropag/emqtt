@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is <ery.lee at gmail dot com>
 %% Copyright (C) 2012 Ery Lee All Rights Reserved.
 
--module(emqtt_client).
+-module(emqtt_connection).
 
 -behaviour(gen_server2).
 
@@ -34,7 +34,7 @@
 
 -include("emqtt_net.hrl").
 
--include("emqtt_client.hrl").
+-include("emqtt_connection.hrl").
 
 -include_lib("elog/include/elog.hrl").
 
@@ -49,17 +49,17 @@ info(Pid) ->
 	gen_server2:call(Pid, info).
 
 init([]) ->
-    io:fwrite("emqtt_client:init([]) function"),
+    io:fwrite("emqtt_connection:init([]) function"),
     process_flag(trap_exit, true),
     {ok, 
-     #emqtt_client_state{parse_state = emqtt_frame:initial_state(), 
+     #emqtt_connection_state{parse_state = emqtt_frame:initial_state(), 
 	    message_id = 1, 
 	    subtopics = [], 
 	    awaiting_ack = gb_trees:empty(), 
 	    awaiting_rel = gb_trees:empty()}, 
      hibernate, {backoff, 1000, 1000, 10000}}.
 
-handle_call(info, _From, #emqtt_client_state{conn_name=ConnName, 
+handle_call(info, _From, #emqtt_connection_state{conn_name=ConnName, 
 	message_id=MsgId, client_id=ClientId} = State) ->
 	Info = [{conn_name, ConnName},
 			{message_id, MsgId},
@@ -67,10 +67,10 @@ handle_call(info, _From, #emqtt_client_state{conn_name=ConnName,
 	{reply, Info, State}.
 
 handle_cast({emqtt_socket, Socket}, State)->
-    emqtt_client_monitor:mon(self()),
+    emqtt_connection_monitor:mon(self()),
     ConnStr = emqtt_net:conn_string(Socket, inbound),
     ?INFO("accepting connection (~s) from emqtt_socket ~n", [ConnStr]),
-    {noreply, State#emqtt_client_state{emqtt_socket = Socket, conn_name = ConnStr}};
+    {noreply, State#emqtt_connection_state{emqtt_socket = Socket, conn_name = ConnStr}};
 
 
 handle_cast({data, Data, Socket}, State) ->
@@ -88,20 +88,20 @@ handle_cast(Msg, State) ->
 handle_info({route, Msg}, State) ->
     emqtt_protocol:process_route(Msg, State);
 
-handle_info(keep_alive_timeout, #emqtt_client_state{keep_alive=KeepAlive}=State) ->
+handle_info(keep_alive_timeout, #emqtt_connection_state{keep_alive=KeepAlive}=State) ->
     case emqtt_keep_alive:state(KeepAlive) of
         idle ->
-            ?INFO("keep alive timeout: ~p", [State#emqtt_client_state.conn_name]),
+            ?INFO("keep alive timeout: ~p", [State#emqtt_connection_state.conn_name]),
             {stop, normal, State};
 	active ->
             KeepAlive1 = emqtt_keep_alive:reset(KeepAlive),
-            {noreply, State#emqtt_client_state{keep_alive=KeepAlive1}}
+            {noreply, State#emqtt_connection_state{keep_alive=KeepAlive1}}
     end;
 
 handle_info(Info, State) ->
 	{stop, {badinfo, Info}, State}.
 
-terminate(_Reason, #emqtt_client_state{client_id=ClientId, keep_alive=KeepAlive}) ->
+terminate(_Reason, #emqtt_connection_state{client_id=ClientId, keep_alive=KeepAlive}) ->
     ok = emqtt_registry:unregister(ClientId),
 	emqtt_keep_alive:cancel(KeepAlive),
 	ok.
@@ -119,7 +119,7 @@ throw_on_error(E, Thunk) ->
     end.
 
 network_error(Reason,
-              State = #emqtt_client_state{ conn_name  = ConnStr}) ->
+              State = #emqtt_connection_state{ conn_name  = ConnStr}) ->
     ?INFO("MQTT detected network error '~p' for ~p", [Reason, ConnStr]),
     send_will_msg(State),
     % todo: flush channel after publish
@@ -132,13 +132,13 @@ process_received_bytes(<<>>, State) ->
     {noreply, State};
 
 process_received_bytes(Bytes,
-                       State = #emqtt_client_state{ parse_state = ParseState,
+                       State = #emqtt_connection_state{ parse_state = ParseState,
                                        conn_name   = ConnStr }) ->
 	?INFO("~p~n", [Bytes]),
     case emqtt_frame:parse(Bytes, ParseState) of
 	{more, ParseState1} ->
 		{noreply,
-		 State#emqtt_client_state{ parse_state = ParseState1},
+		 State#emqtt_connection_state{ parse_state = ParseState1},
 		 hibernate};
 	{ok, Frame, Rest} ->
 		case emqtt_protocol:process_frame(Frame, State) of
@@ -146,7 +146,7 @@ process_received_bytes(Bytes,
 			PS = emqtt_frame:initial_state(),
 			process_received_bytes(
 			  Rest,
-			  State1#emqtt_client_state{ parse_state = PS});
+			  State1#emqtt_connection_state{ parse_state = PS});
 		{err, Reason, State1} ->
 			?ERROR("MQTT protocol error ~p for connection ~p~n", [Reason, ConnStr]),
 			stop({shutdown, Reason}, State1);
@@ -159,7 +159,7 @@ process_received_bytes(Bytes,
     end.
 
 
-send_will_msg(#emqtt_client_state{will_msg = undefined}) ->
+send_will_msg(#emqtt_connection_state{will_msg = undefined}) ->
 	ignore;
-send_will_msg(#emqtt_client_state{will_msg = WillMsg }) ->
+send_will_msg(#emqtt_connection_state{will_msg = WillMsg }) ->
 	emqtt_router:publish(WillMsg).

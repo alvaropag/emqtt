@@ -13,7 +13,7 @@
 %% The Initial Developer of the Original Code is <ery.lee at gmail dot com>
 %% Copyright (C) 2012 Ery Lee All Rights Reserved.
 
--module(emqtt_client_sup).
+-module(emqtt_connection_sup).
 
 -export([start_link/0, start_client/0]).
 
@@ -26,13 +26,13 @@ start_link() ->
 
 init([]) ->
     {ok, {{simple_one_for_one_terminate, 0, 1},
-          [{client, {emqtt_client, start_link, []}, 
-				temporary, 5000, worker, [emqtt_client]}]}}.
+          [{client, {emqtt_connection, start_link, []}, 
+				temporary, 5000, worker, [emqtt_connection]}]}}.
 
 %start_client(Sock) ->
 %    {ok, Client} = supervisor:start_child(?MODULE, []),
 %	ok = gen_tcp:controlling_process(Sock, Client),
-%	emqtt_client:go(Client, Sock),
+%	emqtt_connection:go(Client, Sock),
 
     %% see comment in rabbit_networking:start_client/2
 %    gen_event:which_handlers(error_logger),
@@ -40,6 +40,6 @@ init([]) ->
 %	Client.
 
 start_client() ->
-    io:fwrite("emqtt_client_sup:start_client()~n"),
+    io:fwrite("emqtt_connection_sup:start_client()~n"),
     {ok, Client} = supervisor:start_child(?MODULE, []),
     Client.

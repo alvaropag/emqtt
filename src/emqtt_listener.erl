@@ -20,7 +20,7 @@
 
 -export([spec/2, listener_started/3, listener_stopped/3]).
 
-%% Callback is emqtt_client_sup:start_child
+%% Callback is emqtt_connection_sup:start_child
 spec({Listener, tcp, SockOpts}, Callback) ->
     [tcp_listener_spec(tcp_listener_sup, Address, SockOpts,  mqtt, 
 		       "TCP Listener", Callback) || Address <- tcp_listener_addresses(Listener)];

@@ -57,14 +57,14 @@ init([Listeners]) ->
 		?CHILD(emqtt_retained, worker),
 		?CHILD(emqtt_router, worker),
 		?CHILD(emqtt_registry, worker),
-		?CHILD(emqtt_client_monitor, worker),
-		?CHILD(emqtt_client_sup, supervisor),
+		?CHILD(emqtt_connection_monitor, worker),
+		?CHILD(emqtt_connection_sup, supervisor),
 		?CHILD(emqtt_socket_sup, supervisor)
 		| listener_children(Listeners) ]}
 	}.
 
 listener_children(Listeners) ->
 	lists:append([emqtt_listener:spec(Listener, 
-		{emqtt_client_sup, start_client, []}) || Listener <- Listeners]).
+		{emqtt_connection_sup, start_client, []}) || Listener <- Listeners]).
 
 

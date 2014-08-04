@@ -1,4 +1,4 @@
--record(emqtt_client_state, {
+-record(emqtt_connection_state, {
           emqtt_socket = undefined,
           conn_name,
           parse_state,

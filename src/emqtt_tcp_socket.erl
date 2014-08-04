@@ -23,7 +23,7 @@
 
 -include("emqtt_net.hrl").
 
--record(state, {emqtt_client_pid = undefined, emqtt_socket}).
+-record(state, {emqtt_connection_pid = undefined, emqtt_socket}).
 
 %%%===================================================================
 %%% API
@@ -56,7 +56,7 @@ start_link(EmqttClientPid, Socket) ->
 %%--------------------------------------------------------------------
 init([EmqttClientPid, Socket]) ->
     gen_server:cast(EmqttClientPid, {emqtt_socket, Socket}),
-    {ok, #state{emqtt_client_pid = EmqttClientPid, emqtt_socket = Socket}}.
+    {ok, #state{emqtt_connection_pid = EmqttClientPid, emqtt_socket = Socket}}.
 
 
 go(Pid) ->
@@ -112,20 +112,20 @@ handle_cast(_Msg, State) ->
 %%--------------------------------------------------------------------
 %handle_info(
 
-handle_info({tcp, S, Data}, #state{emqtt_socket = EmqttSocket, emqtt_client_pid = EClientPid} = State) ->
+handle_info({tcp, S, Data}, #state{emqtt_socket = EmqttSocket, emqtt_connection_pid = EClientPid} = State) ->
     %verify if the socket from the callback is the same socket that is in the State, just for safety
     #emqtt_socket{type = tcp, connection = S} = EmqttSocket,
     emqtt_socket:forward_data_to_client(EClientPid, Data, EmqttSocket),
     inet:setopts(S, [{active, once}]),
     {noreply, State};
 
-handle_info({tcp_closed, S}, #state{emqtt_socket = EmqttSocket, emqtt_client_pid = EClientPid} = State) ->
+handle_info({tcp_closed, S}, #state{emqtt_socket = EmqttSocket, emqtt_connection_pid = EClientPid} = State) ->
     io:fwrite("emqtt_tcp_socket:handle_info({tcp_closed, ~p}) ~n", [S]),
     #emqtt_socket{type = tcp, connection = S} = EmqttSocket,
     emqtt_socket:forward_closed_to_client(EClientPid, EmqttSocket),
     {stop, shutdown, State};
 
-handle_info({tcp_error, S, Reason}, #state{emqtt_socket = EmqttSocket, emqtt_client_pid = EClientPid} = State) ->
+handle_info({tcp_error, S, Reason}, #state{emqtt_socket = EmqttSocket, emqtt_connection_pid = EClientPid} = State) ->
     io:fwrite("emqtt_tcp_socket:handle_info({tcp_error, ~p, ~p}) ~n", [S, Reason]),
     #emqtt_socket{type = tcp, connection = S} = EmqttSocket,
     emqtt_socket:forward_error_to_client(EClientPid, Reason, EmqttSocket),
@@ -164,7 +164,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-%loop_receive(#state{emqtt_client_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
+%loop_receive(#state{emqtt_connection_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
     %recover tcp socket from emqtt_socket record
 %    #emqtt_socket{type = tcp, connection = Socket} = EmqttSocket,
 
@@ -173,7 +173,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %    io:fwrite("Inside loop_receive on emqtt_tcp_socket, waiting for data~n"),
 
-    %forward the data/error/status to the emqtt_client process
+    %forward the data/error/status to the emqtt_connection process
 %    receive
 %        {tcp, S, Data} ->
 %            emqtt_socket:forward_data_to_client(EClientPid, Data, EmqttSocket),

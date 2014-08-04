@@ -9,8 +9,8 @@
 
 -record(state, {cm,         %% Connection _ConnectionManager
 		channel_id, %% Channel ID
-                emqtt_client_pid, %% Pid of the process to send data to
-                emqtt_socket      %% Socket for the emqtt_client
+                emqtt_connection_pid, %% Pid of the process to send data to
+                emqtt_socket      %% Socket for the emqtt_connection
                } 
        ).
 
@@ -26,7 +26,7 @@ init(Options) ->
 
 %% Type = 1 ("stderr") | 0 ("normal") 
 handle_ssh_msg({ssh_cm, _ConnectionManager,
-		{data, _ChannelId, Type, Data}}, #state{emqtt_client_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
+		{data, _ChannelId, Type, Data}}, #state{emqtt_connection_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
     error_logger:info_msg("ssh_cm.data, ConnectionManager=~p, ChannelId=~p, Type=~p, Data=~s, State=~p~n", [_ConnectionManager, _ChannelId, Type, Data, State]),
     emqtt_socket:forward_data_to_client(EClientPid, Data, EmqttSocket),
     {ok, State};
@@ -40,7 +40,7 @@ handle_ssh_msg({ssh_cm, _, {signal, _, _}}, State) ->
     error_logger:info_msg("ssh_cm.signal, State=~p~n", [State]),
     {ok, State};
  
-handle_ssh_msg({ssh_cm, _, {exit_signal, ChannelId, _, Error, _}}, #state{emqtt_client_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
+handle_ssh_msg({ssh_cm, _, {exit_signal, ChannelId, _, Error, _}}, #state{emqtt_connection_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
     Report = io_lib:format("Connection closed by peer ~n Error ~p~n",
 			   [Error]),
     error_logger:error_report(Report),
@@ -52,7 +52,7 @@ handle_ssh_msg({ssh_cm, _, {exit_status, ChannelId, 0}}, State) ->
     error_logger:info_msg("ssh_cm.exit, ChannelId=~p, State=~p~n", [ChannelId, State]),
     {stop, ChannelId, State};
 
-handle_ssh_msg({ssh_cm, _, {exit_status, ChannelId, Status}}, #state{emqtt_client_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
+handle_ssh_msg({ssh_cm, _, {exit_status, ChannelId, Status}}, #state{emqtt_connection_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
     
     Report = io_lib:format("Connection closed by peer ~n Status ~p~n",
 			   [Status]),
@@ -60,7 +60,7 @@ handle_ssh_msg({ssh_cm, _, {exit_status, ChannelId, Status}}, #state{emqtt_clien
     emqtt_socket:forward_closed_to_client(EClientPid, EmqttSocket),
     {stop, ChannelId, State};
 
-handle_ssh_msg({ssh_cm, _, {closed, ChannelId}}, #state{emqtt_client_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
+handle_ssh_msg({ssh_cm, _, {closed, ChannelId}}, #state{emqtt_connection_pid = EClientPid, emqtt_socket = EmqttSocket} = State) ->
     emqtt_socket:forward_closed_to_client(EClientPid, EmqttSocket),
     {stop, ChannelId, State}.
 
@@ -72,15 +72,15 @@ handle_msg({ssh_channel_up, ChannelId, ConnectionManager}, State) ->
     EmqttSocket = #emqtt_socket{type = ssh, connection = ConnectionManager, channel = ChannelId},
     
     %% Start the emqtt client
-    {ok, EClientPid} = emqtt_client_sup:start_client(),
+    {ok, EClientPid} = emqtt_connection_sup:start_client(),
 
-    %% Send the socket to the emqtt_client
+    %% Send the socket to the emqtt_connection
     emqtt_socket:forward_socket_to_client(EClientPid, EmqttSocket),
 
     %% Return the state
     {ok, #state{channel_id = ChannelId,
 		cm = ConnectionManager, 
-                emqtt_client_pid = EClientPid, 
+                emqtt_connection_pid = EClientPid, 
                 emqtt_socket = EmqttSocket}}.    
 		     
 terminate(Reason, State) ->
