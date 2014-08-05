@@ -49,7 +49,7 @@
   {registered, [emqtt_auth,
   	        emqtt_router,
 		emqtt_registry,
-		emqtt_client_monitor]},
+		emqtt_connection_monitor]},
 
   {applications, [kernel,
                   stdlib]},

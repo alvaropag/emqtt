@@ -136,10 +136,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 
-send(#emqtt_socket{type=tcp, connection = Conn} = Socket, Packet) ->
+send(#emqtt_socket{type=tcp, connection = Conn}, Packet) ->
     gen_tcp:send(Conn, Packet);
 
-send(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Packet) ->
+send(#emqtt_socket{type=ssh, connection = Conn, channel = Channel}, Packet) ->
     emqtt_ssh_socket:send(Conn, Channel, Packet).
 
 %recv(#emqtt_socket{type=tcp, connection = Conn} = Socket, Length) -> 
@@ -155,13 +155,13 @@ send(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket, Pac
     %will call the receive from the emqtt_ssh_socket
 %    emqtt_ssh_socket:recv(Conn, Channel, Length, Timeout).
 
-close(#emqtt_socket{type=tcp, connection = Conn} = Socket) ->
+close(#emqtt_socket{type=tcp, connection = Conn}) ->
     io:fwrite("emqtt_socket:close(tcp, ~p) closed", [Conn]),
     gen_tcp:close(Conn);
 
-close(#emqtt_socket{type=ssh, connection = Conn, channel = Channel} = Socket) ->
-    emqtt_ssh_socket:close(Conn, Channel).
-    %ssh_connection:close(Conn, Channel).
+close(#emqtt_socket{type=ssh, connection = Conn, channel = Channel}) ->
+    %emqtt_ssh_socket:close(Conn, Channel).
+    ssh_connection:close(Conn, Channel).
 
 %setopts(#emqtt_socket{type = tcp, connection = Conn} = Socket, Options) ->
 %    inet:setopts(Conn, Options);
