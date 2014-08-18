@@ -49,7 +49,7 @@ info(Pid) ->
 	gen_server2:call(Pid, info).
 
 init([]) ->
-    io:fwrite("emqtt_connection:init([]) function"),
+    io:fwrite("emqtt_connection:init([]) function~n"),
     process_flag(trap_exit, true),
     {ok, 
      #emqtt_connection_state{parse_state = emqtt_frame:initial_state(), 
@@ -68,8 +68,8 @@ handle_call(info, _From, #emqtt_connection_state{conn_name=ConnName,
 
 handle_cast({emqtt_socket, Socket}, State)->
     emqtt_connection_monitor:mon(self()),
-    ConnStr = emqtt_net:conn_string(Socket, inbound),
-    ?INFO("accepting connection (~s) from emqtt_socket ~n", [ConnStr]),
+    {ok, ConnStr} = emqtt_net:conn_string(Socket, inbound),
+    ?INFO("accepting connection (~p) from emqtt_socket ~n", [ConnStr]),
     {noreply, State#emqtt_connection_state{emqtt_socket = Socket, conn_name = ConnStr}};
 
 
@@ -80,6 +80,7 @@ handle_cast({error, Reason, Socket}, State) ->
     network_error(Reason, State);
 
 handle_cast({closed, Socket}, State) ->
+
     {stop, closed, State};
 
 handle_cast(Msg, State) ->
@@ -97,6 +98,7 @@ handle_info(keep_alive_timeout, #emqtt_connection_state{keep_alive=KeepAlive}=St
             KeepAlive1 = emqtt_keep_alive:reset(KeepAlive),
             {noreply, State#emqtt_connection_state{keep_alive=KeepAlive1}}
     end;
+
 
 handle_info(Info, State) ->
 	{stop, {badinfo, Info}, State}.

@@ -72,7 +72,7 @@ handle_msg({ssh_channel_up, ChannelId, ConnectionManager}, State) ->
     EmqttSocket = #emqtt_socket{type = ssh, connection = ConnectionManager, channel = ChannelId},
     
     %% Start the emqtt client
-    {ok, EClientPid} = emqtt_connection_sup:start_client(),
+    EClientPid = emqtt_connection_sup:start_client(),
 
     %% Send the socket to the emqtt_connection
     emqtt_socket:forward_socket_to_client(EClientPid, EmqttSocket),

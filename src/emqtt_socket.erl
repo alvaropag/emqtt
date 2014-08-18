@@ -140,7 +140,10 @@ send(#emqtt_socket{type=tcp, connection = Conn}, Packet) ->
     gen_tcp:send(Conn, Packet);
 
 send(#emqtt_socket{type=ssh, connection = Conn, channel = Channel}, Packet) ->
-    emqtt_ssh_socket:send(Conn, Channel, Packet).
+    io:fwrite("Sending SSH Data to Connection ~p, Channel ~p~n", [Conn, Channel]),
+    Ret = ssh_connection:send(Conn, Channel, 0, Packet, 10000),
+    io:fwrite("Return of SSH Send Data ~p~n", [Ret]),
+    Ret.
 
 %recv(#emqtt_socket{type=tcp, connection = Conn} = Socket, Length) -> 
 %    recv(Socket, Length, 0);

@@ -166,7 +166,7 @@ conn_string(#emqtt_socket{type = tcp, connection = Conn}, Direction) ->
     connection_string(Conn, Direction);
 
 conn_string(#emqtt_socket{type = ssh, connection = Conn, channel = Channel}, _) ->
-    {HostName, IP, Port} = ssh:connection_info(Conn, [peer]),
+    [{peer, {HostName, {IP, Port}}}] = ssh:connection_info(Conn, [peer]),
     {ok, lists:flatten(io_lib:format("ssh_~p:~p -> ~p@~s:~p", [Conn, Channel, HostName, maybe_ntoab(IP), Port]))}.
 
 connection_string(Sock, Direction) ->
